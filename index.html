@@ -1,0 +1,553 @@
+<!--
+CandyCrush
+Your Name: Teresa Lin
+Collaborators: Alex Chen, Jingyu Li, Jenny Liu, Andrew Shea, Piazza posts, the amazing TAs
+-->
+<!DOCTYPE html>
+<html>
+<!--
+/* Copyright (c) 2017 MIT 6.813/6.831 course staff, all rights reserved.
+ * Redistribution of original or derived work requires permission of course staff.
+ */
+-->
+
+<head>
+<meta charset="utf-8">
+<title>CandyCrush</title>
+
+<!-- Load style sheets -->
+<link rel="stylesheet" href=
+  "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.css">
+
+<link rel="stylesheet" href="mainLayout.css">
+
+<!-- Use mobile-aware viewport -->
+<meta name="viewport" content=
+  "width=device-width, initial-scale=1, shrink-to-fit=no">
+
+<!-- Load any supplemental Javascript libraries here -->
+<script src=
+  "https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+<script src=
+  "https://cdnjs.cloudflare.com/ajax/libs/seedrandom/2.4.2/seedrandom.js">
+</script>
+<script src="candy.js"></script>
+<script src="board.js"></script>
+<script src="rules.js"></script>
+
+<script>
+
+// By default, the first board loaded by your page will be the same 
+// each time you load (which is accomplished by "seeding" the random
+// number generator. This makes testing (and grading!) easier!
+Math.seedrandom(0);
+
+
+// A short jQuery extension to read query parameters from the URL.
+$.extend({
+  getUrlVars: function() {
+    var vars = [], pair;
+    var pairs = window.location.search.substr(1).split('&');
+    for (var i = 0; i < pairs.length; i++) {
+      pair = pairs[i].split('=');
+      vars.push(pair[0]);
+      vars[pair[0]] = pair[1] &&
+          decodeURIComponent(pair[1].replace(/\+/g, ' '));
+    }
+    return vars;
+  },
+  getUrlVar: function(name) {
+    return $.getUrlVars()[name];
+  }
+});
+
+// constants
+var DEFAULT_BOARD_SIZE = 8;   // min 3, max 20
+
+// data model at global scope for easier debugging
+var board;
+var rules;
+var cellWidth;
+
+// canvas
+var canvas;
+var ctxt;
+
+// initialize board
+var beginning = false;
+var url_var_size = parseInt($.getUrlVar('size'));
+if (url_var_size >= 3 && url_var_size <= 20) {
+  board = new Board(url_var_size);
+} else {
+  board = new Board(DEFAULT_BOARD_SIZE);
+}
+
+// load a rule
+rules = new Rules(board);
+var ALPHABET = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't'];
+var directions = ['up', 'down', 'left', 'right'];
+var colorIconMap = {'red': 'red-candy.png',
+  'yellow': 'yellow-candy.png',
+  'green': 'green-candy.png',
+  'orange': 'orange-candy.png',
+  'blue': 'blue-candy.png',
+  'purple': 'purple-candy.png' };
+
+// find out the column number based on the column letter
+function findColNumber(letter) {
+  for(i=0; i<ALPHABET.length; i++) {
+    if(ALPHABET[i] == letter) {
+      return i;
+    }
+  }
+}
+
+// Final initialization entry point: the Javascript code inside this block
+// runs at the end of start-up when the page has finished loading.
+$(document).ready(function()
+{
+  cellWidth = 320/board.getSize();
+  beginning = true;
+  rules.prepareNewGame();
+  canvas = document.getElementById("arrowCanvas");
+  ctxt = canvas.getContext('2d');
+  beginning = false;
+});
+
+
+/* Event Handlers */
+// access the candy object with info.candy
+
+// add a candy to the board
+$(board).on('add', function(e, info)
+{
+  var row = info.candy.row;
+  var col = info.candy.col;
+  var element = $('#'+ALPHABET[col] + (row+1));
+  var color = info.candy.color;
+  var fromRow = info.fromRow;
+  var fromCol = info.fromCol;
+  var topShift;
+  var leftShift;
+  var new_img = "<img class=\"cell\" src=\"graphics/" + colorIconMap[color] + "\"" + "width=\"" + cellWidth + "\" height=\"" + cellWidth + "\" id=\"" + ALPHABET[col] + (row+1) + "\">";
+  $('#grid').append(new_img);
+
+  // if fromRow or fromCol are null, just add them in
+  if(!fromRow && !fromCol) {
+    $("#" + ALPHABET[col] + (row+1)).css({'top': 200+(row*cellWidth)+'px', 'left': 125+(col*cellWidth)+'px', 'position':'absolute', 'z-index': 20});
+  } 
+  // else drop them in smoothly
+  else {
+    var baseHeight = 200 - cellWidth;
+    topShift = cellWidth*(row+1);
+    leftShift = cellWidth*(col-fromCol);
+    // $("#" + ALPHABET[col] + (row+1)).fadeIn(1000, "swing", function() {
+    //   $("#" + ALPHABET[col] + (row+1)).css({'top': baseHeight+'px', 'left': 125+(fromCol*cellWidth)+'px', 'position':'absolute', 'z-index': 20});
+    // })
+    $("#" + ALPHABET[col] + (row+1)).css({'top': baseHeight+'px', 'left': 125+(fromCol*cellWidth)+'px', 'position':'absolute', 'z-index': 20});
+
+    $("#" + ALPHABET[col] + (row+1)).animate({'top': "+=" + topShift, 'left': "+=" + leftShift}, 400);
+  }
+});
+
+// move a candy on the board
+$(board).on('move', function(e, info)
+{
+  var row = info.candy.row; //new row
+  var col = info.candy.col; //new col
+  var color = info.candy.color;
+  var fromRow = info.fromRow;
+  var fromCol = info.fromCol;
+  // var topShift = wid*(row-fromRow);
+  // var leftShift = wid*(col-fromCol);
+
+  var currentX = parseInt($("#" + ALPHABET[fromCol] + (fromRow+1)).css("left"), 10);
+  var currentY = parseInt($("#" + ALPHABET[fromCol] + (fromRow+1)).css("top"), 10);
+  var topShift = row*cellWidth + gridRelTopLeftY - currentY;
+  var leftShift = col*cellWidth + gridRelTopLeftX - currentX;
+
+  $("#" + ALPHABET[fromCol] + (fromRow+1)).animate({'top': "+=" + topShift, 'left': "+=" + leftShift}, 400, "swing");
+
+  // change ID
+  if ($("#" + ALPHABET[col] + (row+1)).length == 0) {
+    var correctID = ALPHABET[col] + (row+1);
+    $("#" + ALPHABET[fromCol] + (fromRow+1)).attr('id', correctID);
+    //change the last flipped candy's ID too
+    var otherID = ALPHABET[fromCol] + (fromRow+1);
+    $("#" + ALPHABET[fromCol] + (fromRow+1) + 'temp').attr('id', otherID);
+  } else {
+    var tempID = ALPHABET[col] + (row+1) + 'temp';
+    $("#" + ALPHABET[fromCol] + (fromRow+1)).attr('id', tempID);
+  }
+});
+
+// remove a candy from the board
+$(board).on('remove', function(e, info)
+{
+  var row = info.fromRow;
+  var col = info.fromCol;
+  var element = $('#'+ALPHABET[col] + (row+1));
+  if (beginning) {
+    element.remove();
+  } else {
+    $('#'+ALPHABET[col] + (row+1)).fadeOut(100, 'linear', function() {
+      $('#'+ALPHABET[col] + (row+1)).remove();
+    });
+  }
+});
+
+// update the scoreboard
+$(board).on('scoreUpdate', function(e, info)
+{
+  var score = info.score;
+  document.getElementById("score").innerHTML = score+" points";
+  if (info.score > 0) {
+    var color = info.candy.color;
+    $("#score").css('background-color', color);
+    if (color == 'yellow') {
+      $("#score").css('color', 'gray');
+    } else {
+      $("#score").css('color', 'white');
+    }
+  }
+});
+
+// Button Events
+// Generate new game board when 'New Game' button is clicked
+$(document).on('click', "#newgame", function(evt)
+{
+  ctxt.clearRect(-1/2*canvas.width, -1/2*canvas.height, canvas.width, canvas.height);
+  beginning = true;
+  board.clear();  
+  rules.prepareNewGame();
+  beginning = false;
+});
+
+// Show a possible move with an arrow
+$(document).on('click', "#showmove", function(evt) {
+  ctxt.clearRect(-1/2*canvas.width, -1/2*canvas.height, canvas.width, canvas.height);
+  ctxt.save();
+  var randomMove = rules.getRandomValidMove();
+  var candy = randomMove.candy;
+  // candy has row, col, color, id
+  var direction = randomMove.direction;
+  var row = candy.row;
+  var col = candy.col;
+  var rowShift;
+  var colShift;
+  var rotate;
+
+  if (direction == "right") {
+    rowShift = 1/6;
+    colShift = 3/4;
+    rotate = 0;
+    height = cellWidth*2/3;
+    width = cellWidth*1/2;
+
+  } else if (direction == "down") {
+    rowShift = 3/4;
+    colShift = 1/6;
+    rotate = Math.PI/2;
+    height = cellWidth*1/2;
+    width = cellWidth*2/3;
+
+  } else if (direction == "left") {
+    rowShift = 1/6;
+    colShift = -1/4;
+    rotate = Math.PI;
+    height = cellWidth*2/3;
+    width = cellWidth*1/2;
+
+  } else if (direction == "up") {
+    rowShift = -1/4;
+    colShift = 1/6;
+    rotate = Math.PI*3/2;
+    height = cellWidth*1/2;
+    width = cellWidth*2/3;
+  }
+
+  ctxt.fillStyle = "#000";
+  ctxt.strokeStyle = '#000';
+  ctxt.lineWidth = 2;
+
+  canvas.style.top = (200+Math.floor(cellWidth*(row+rowShift))) + "px";  //200 is the padding-top
+  canvas.style.left = (125+Math.floor(cellWidth*(col+colShift))) + "px";  //125 = 115 margin + 10 padding
+  canvas.height = height;
+  canvas.width = width;
+
+  // arrow coordinates
+  var a = [-1/2*canvas.width, 1/6*canvas.height];
+  var b = [-1/2*canvas.width, -1/6*canvas.height];
+  var c = [0, -1/6*canvas.height];
+  var d = [0, -1/2*canvas.height];
+  var e = [3/8*canvas.width, 0];
+  var f = [0, 1/2*canvas.height];
+  var g = [0, 1/6*canvas.height];
+
+  ctxt.translate(canvas.width/2, canvas.height/2);
+
+  ctxt.rotate(rotate);
+  ctxt.beginPath();
+  ctxt.moveTo(a[0],a[1]);
+  ctxt.lineTo(b[0],b[1]);
+  ctxt.lineTo(c[0],c[1]);
+  ctxt.lineTo(d[0],d[1]);
+  ctxt.lineTo(e[0],e[1]);
+  ctxt.lineTo(f[0],f[1]);
+  ctxt.lineTo(g[0],g[1]);
+  ctxt.closePath();
+  ctxt.fill();
+  ctxt.stroke();
+
+  ctxt.restore();
+});
+
+var releaseCandy = null;
+var dragCandy = null;
+var dragCandyX = null; // an int
+var dragCandyY = null; // an int
+var dragCandyRelativeX = null; // a string
+var dragCandyRelativeY = null; // a string
+var flag = 0;
+var mouseStartX = 0;
+var mouseStartY = 0;
+var gridAbsTopLeftX = null;
+var gridAbsTopLeftY = null;
+var gridRelTopLeftX = null;
+var gridRelTopLeftY = null;
+
+var mouseStopX = 0;
+var mouseStopY = 0;
+
+/*
+mousedown event for a cell:
+change z-index of cell to 30
+change flag to 1
+store candy info
+store mouse start location
+*/
+$(document).on("mousedown", ".cell", function(evt) {
+  evt.preventDefault();
+  dragCandy = this;
+  $(dragCandy).css("z-index", 30);
+  flag = 1;
+
+  // absolute coordinates
+  dragCandyX = parseInt($(dragCandy).offset().left, 10);
+  dragCandyY = parseInt($(dragCandy).offset().top, 10);
+
+  // relative positioning
+  dragCandyRelativeX = dragCandy.style.left;
+  dragCandyRelativeY = dragCandy.style.top;
+
+  // mouse position (absolute coords)
+  mouseStartX = evt.pageX;
+  mouseStartY = evt.pageY;
+
+  // grid top left corner (absolute coords)
+  gridAbsTopLeftX = parseInt($("#a1").offset().left, 10);
+  gridAbsTopLeftY = parseInt($("#a1").offset().top, 10);
+
+  // grid top left corner (relative to left and top margin of this container)
+  gridRelTopLeftX = parseInt($("#a1").css("left"), 10);
+  gridRelTopLeftY = parseInt($("#a1").css("top"), 10);
+});
+
+/*
+mousemove:
+if flag is 1:
+move candy
+*/
+$(document).on("mousemove", function(event) {
+  if (flag == 1) {
+    event.preventDefault();
+
+    var deltaX = event.pageX - mouseStartX;
+    var deltaY = event.pageY - mouseStartY;
+
+    // bound deltaX
+    if (deltaX > 0 && deltaX > (gridAbsTopLeftX+320-dragCandyX-cellWidth)) {
+      deltaX = gridAbsTopLeftX+320-dragCandyX-cellWidth;
+    } else if (deltaX < 0 && deltaX < (gridAbsTopLeftX-dragCandyX)) {
+      deltaX = gridAbsTopLeftX-dragCandyX;
+    }
+
+    // bound deltaY
+    if (deltaY > 0 && deltaY > (gridAbsTopLeftY+320-dragCandyY-cellWidth)) {
+      deltaY = gridAbsTopLeftY+320-dragCandyY-cellWidth;
+    } else if (deltaY < 0 && deltaY < (gridAbsTopLeftY-dragCandyY)) {
+      deltaY = gridAbsTopLeftY-dragCandyY;
+    }
+
+    var newX = parseInt(dragCandyRelativeX, 10) + deltaX;
+    var newY = parseInt(dragCandyRelativeY, 10) + deltaY;
+    $(dragCandy).css({'top': newY+"px", 'left': newX+"px"});
+  }
+});
+
+
+/*
+mouseup:
+change z-index of cell back to 20
+change flag to 0
+store candy info
+store mouse stop location
+
+if mouseup occurs in grid:
+swap candies
+
+if mouseup occurs outside of grid:
+return candy to original location
+*/
+$(document).on("mouseup", function(evt) {
+  if (flag == 1) {
+    evt.preventDefault();
+    flag = 0;
+    mouseStopX = evt.pageX;
+    mouseStopY = evt.pageY;
+
+    // determine which cell mouseup occurred over
+    var colNumber = Math.floor((mouseStopX - gridAbsTopLeftX) / cellWidth);
+    var rowNumber = Math.floor((mouseStopY - gridAbsTopLeftY) / cellWidth);
+
+    if (colNumber >= board.getSize() || rowNumber >= board.getSize() || colNumber < 0 || rowNumber < 0) {
+      // mouseup occurs outside of grid
+      $(dragCandy).css({'top': dragCandyRelativeY, 'left': dragCandyRelativeX});
+    } else {
+      // mouseup occurs inside grid
+      var colLetter = ALPHABET[colNumber];
+      var idRowNumber = rowNumber + 1;
+      var releaseCandyId = colLetter + idRowNumber;
+      releaseCandy = document.getElementById(releaseCandyId);
+
+      var col_letter = dragCandy.id[0];
+      var row = parseInt(dragCandy.id.substring(1));
+      var candy = board.getCandyAt(row-1, findColNumber(col_letter));
+      var flipWithCandy = board.getCandyAt(rowNumber, colNumber);
+
+      if (isNeighbor(candy, flipWithCandy) && rules.isMoveTypeValid(candy, whichDirection(candy, flipWithCandy))) {
+        ctxt.clearRect(-1/2*canvas.width, -1/2*canvas.height, canvas.width, canvas.height);
+        swapCandyDrag(candy, flipWithCandy);
+      } else {
+        $(dragCandy).css({'top': dragCandyRelativeY, 'left': dragCandyRelativeX});
+      }
+    }
+    $(dragCandy).css("z-index", 20);
+
+    // reset variables
+    // dragCandy = null;
+    // dragCandyX = null;
+    // dragCandyY = null;
+    // dragCandyRelativeX = null;
+    // dragCandyRelativeY = null;
+    // mouseStartX = 0;
+    // mouseStartY = 0;
+    // gridAbsTopLeftX = null;
+    // gridAbsTopLeftY = null;
+    // gridRelTopLeftX = null;
+    // gridRelTopLeftY = null;
+    // mouseStopX = 0;
+    // mouseStopY = 0;
+  }
+});
+
+// determine the direction that the candy to be dragged to is in
+function whichDirection(candy, flipWithCandy) {
+  if (flipWithCandy.row > candy.row) {
+    return 'down';
+  }
+  if (flipWithCandy.row < candy.row) {
+    return 'up';
+  }
+  if (flipWithCandy.col > candy.col) {
+    return 'right';
+  }
+  if (flipWithCandy.col < candy.col) {
+    return 'left';
+  }
+}
+
+// determine if flipWithCandy is a neighbor of candy
+function isNeighbor(candy, flipWithCandy) {
+  if ((Math.abs(flipWithCandy.row - candy.row) == 1 && Math.abs(flipWithCandy.col - candy.col) == 0) || (Math.abs(flipWithCandy.row - candy.row) == 0 && Math.abs(flipWithCandy.col - candy.col) == 1)) {
+    return true;
+  }
+  return false;
+}
+
+// disable new game and show move buttons
+function disableNewGameShowMove() {
+  document.getElementById("newgame").disabled = true;
+  document.getElementById("showmove").disabled = true;
+}
+
+// enable new game and show move buttons
+function enableNewGameShowMove() {
+  document.getElementById("newgame").disabled = false;
+  document.getElementById("showmove").disabled = false;
+}
+
+
+// swaps 2 candies upon dragging candy
+function swapCandyDrag(candy, flipWithCandy) {
+  board.flipCandies(candy, flipWithCandy);
+  $('#grid').css('pointer-events', 'none');
+  disableNewGameShowMove();
+  var wait = setTimeout(crushCandies, 500);
+}
+
+// crushes any crushes on the board
+function crushCandies() {
+  rules.removeCrushes(rules.getCandyCrushes());
+  var timeout = setTimeout(shiftCandiesDownAndChainCrush, 500);
+}
+
+// shift candies down and check for chain crushes, recurse if necessary
+function shiftCandiesDownAndChainCrush() {
+  rules.moveCandiesDown();
+  // check for chain crushes
+  if (rules.getCandyCrushes().length != 0) {
+    var wait = setTimeout(crushCandies, 500);
+  } else {
+    $('#grid').css('pointer-events', 'auto');
+    enableNewGameShowMove();
+  }
+}
+</script>
+
+
+</head>
+
+<body>
+
+<div class="container">
+  <div class="row">
+
+    <div class="col-md-3" id="firstColumn">
+      <h2 class="text-center text-danger">
+        <strong>Candy</strong>
+      </h2>
+      <h2 class="text-center text-danger">
+        <strong>Crush</strong>
+      </h2>
+      <!-- <p class="text-center"><input class="btn" type="button" id="score" value="0 points"></p> -->
+      <h5 class="text-center" id="score">0 points</h5>
+      <p class="text-center"><input class="btn" type="button" id="newgame" value="New Game"></p>
+      <p class="text-center"><input class="btn" type="button" id="showmove" value="Show Move"></p>
+    </div>
+
+    <div class="col-md-6" id="mainColumn">
+      <div class="board" id="grid" align="center">
+      </div>
+      <canvas id="arrowCanvas" height="0" width="0" ></canvas>
+    </div>
+
+    <div class="col-md-3" id="lastColumn">
+    </div>
+
+  </div>
+</div>
+
+</body>
+
+</html>

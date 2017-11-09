@@ -1,0 +1,87 @@
+/* Copyright (c) 2017 MIT 6.813/6.831 course staff, all rights reserved.
+ * Redistribution of original or derived work requires permission of course staff.
+ */
+
+/* REMOVE ME - dashed lines and height for debugging */
+#firstColumn {
+  padding-top: 250px;
+}
+
+#mainColumn {
+  padding-left: 10px;
+  padding-right: 10px;
+  padding-top: 200px;
+}
+
+#lastColumn {
+  padding-top: 260px;
+}
+
+.typeMove {
+  width: 150px;
+  margin: 0 auto;
+}
+
+#grid {
+  width: 320px;
+  height: 320px;
+  color: white;
+  z-index: 1;
+  margin-left: 115px;
+  margin-right: 115px;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.row {
+  margin-left: 0px;
+  margin-right: 0px;
+}
+
+.table th, .table td {
+  padding: 0;
+  vertical-align: middle;
+  width: 40px;
+  /*height: 40px;*/
+  text-align: center;
+}
+
+td[bgcolor = 'yellow'] {
+  color: gray;
+}
+
+body {
+  font-size: 0rem;
+}
+
+#newgame {
+  width: 120px;
+}
+
+#score {
+  /*width: 120px;*/
+  margin-top: 10px;
+  margin-bottom: 10px;
+  margin-left: 10px;
+  margin-right: 10px;
+  font-family: sans-serif;
+  background-color: rgb(192, 192, 192);
+}
+
+#showmove {
+  width: 120px;
+}
+
+#crush {
+  width: 120px;
+}
+
+#arrowCanvas {
+/*  height: 320px;
+  width: 320px;*/
+  z-index: 25;
+  top: 200px;   /* same as mainColumn padding-top */
+  left: 125px;  /* 115 + 10 */
+  position: absolute;
+  /*border: 1px solid #000000; */ /* delete later and uncomment height and width */
+}
